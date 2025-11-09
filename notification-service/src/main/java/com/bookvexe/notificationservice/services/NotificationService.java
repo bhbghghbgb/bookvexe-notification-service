@@ -21,6 +21,10 @@ public class NotificationService {
         return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 
+    public NotificationDbModel getNotificationById(UUID id) {
+        return notificationRepository.findById(id).orElseThrow();
+    }
+
     public Long getUnreadCount(UUID userId) {
         return notificationRepository.countUnreadByUserId(userId);
     }

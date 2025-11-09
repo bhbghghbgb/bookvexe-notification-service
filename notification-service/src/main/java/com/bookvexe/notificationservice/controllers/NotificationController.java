@@ -26,6 +26,11 @@ public class NotificationController {
         return ResponseEntity.ok(notifications);
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<NotificationDbModel> getNotification(@PathVariable UUID id) {
+        return ResponseEntity.ok(notificationService.getNotificationById(id));
+    }
+
     @GetMapping("/notifications/unread-count")
     public ResponseEntity<Map<String, Long>> getUnreadCount(@RequestParam UUID userId) {
         Long count = notificationService.getUnreadCount(userId);
