@@ -12,13 +12,18 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/notification-service-api")
+@RequestMapping("")
 @RequiredArgsConstructor
 @Slf4j
 @CrossOrigin(origins = "*")
 public class NotificationController {
 
     private final NotificationService notificationService;
+
+    @GetMapping("/info")
+    public ResponseEntity<Map<String, String>> getInfo() {
+        return ResponseEntity.ok(Map.of("service", "notification-service", "status", "running"));
+    }
 
     @GetMapping("/notifications")
     public ResponseEntity<List<NotificationDbModel>> getNotifications(@RequestParam UUID userId) {

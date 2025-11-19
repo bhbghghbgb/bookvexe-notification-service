@@ -1,8 +1,9 @@
-# Server Port
+# Mail Service Kubernetes Configuration
 server:
   port: 8083
+  servlet:
+    context-path: /api/mail-service
 
-# Spring Application Name
 spring:
   application:
     name: mail-service
@@ -21,7 +22,7 @@ spring:
 
   kafka:
     consumer:
-      bootstrap-servers: localhost:9092
+      bootstrap-servers: kafka-service:9092
       group-id: mail_group
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
@@ -40,9 +41,9 @@ spring:
       enabled: false
 
   datasource:
-    url: jdbc:postgresql://localhost:5441/bookvexedb_j2e
-    username: root
-    password: nopass
+    url: jdbc:postgresql://postgres-service:5441/bookvexedb_j2e
+    username: postgres
+    password: root
 
   jpa:
     show-sql: true
@@ -54,6 +55,5 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         use_sql_comments: true
 
-# Custom Mail Flag
 mail:
   dry-run: true
