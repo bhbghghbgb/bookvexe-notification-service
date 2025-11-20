@@ -16,7 +16,7 @@ spec:
       containers:
         - name: mail-service
           image: mail-service:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - containerPort: 8083
           env:
@@ -27,7 +27,7 @@ spec:
             - name: SPRING_DATASOURCE_PASSWORD
               value: "root"
             - name: SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS
-              value: "kafka:9092"
+              value: "kafka-service:9092"
             - name: MAIL_USERNAME
               value: "nguyendinhthongdhsg@gmail.com"
             - name: MAIL_PASSWORD
