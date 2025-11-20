@@ -21,7 +21,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Configuration
@@ -31,18 +30,24 @@ public class SpringBatchConfig {
 
     private final JavaMailSender mailSender;
     private final TemplateEngine templateEngine;
-    private final List<MailKafkaDTO> mailQueue = new ArrayList<>(); // Shared queue
+    // Inject the mailQueue bean
+    private final List<MailKafkaDTO> mailQueue;
 
     @Value("${mail.dry-run:false}")
     private boolean dryRun;
 
+    @Value("${spring.mail.username}") // Inject the configured username
+    private String mailFrom;
+
     @Bean
     public Job sendMailJob(JobRepository jobRepository, Step sendMailStep) {
+        log.debug("Configuring Spring Batch Job: sendMailJob");
         return new JobBuilder("sendMailJob", jobRepository).flow(sendMailStep).end().build();
     }
 
     @Bean
     public Step sendMailStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+        log.debug("Configuring Spring Batch Step: sendMailStep with chunk size 10");
         return new StepBuilder("sendMailStep", jobRepository).<MailKafkaDTO, MimeMessage>chunk(10, transactionManager) // Process 10 emails per batch
             .reader(mailItemReader()).processor(mailItemProcessor()).writer(mailItemWriter()).build();
     }
@@ -52,9 +57,12 @@ public class SpringBatchConfig {
         return () -> {
             synchronized (mailQueue) {
                 if (!mailQueue.isEmpty()) {
-                    return mailQueue.remove(0);
+                    MailKafkaDTO mailDto = mailQueue.remove(0);
+                    log.debug("Reading mail from queue for recipient: {}", mailDto.getTo());
+                    return mailDto;
                 }
             }
+            log.debug("Mail queue is empty, ending batch reading.");
             return null; // End of reading
         };
     }
@@ -62,22 +70,28 @@ public class SpringBatchConfig {
     @Bean
     public ItemProcessor<MailKafkaDTO, MimeMessage> mailItemProcessor() {
         return item -> {
+            log.info("Processing mail for recipient: {}", item.getTo());
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
 
             Context context = new Context();
             if (item.getTemplateModel() != null) {
                 context.setVariables(item.getTemplateModel());
+                log.debug("Set {} template variables for recipient: {}", item.getTemplateModel().size(), item.getTo());
             }
             if (item.getBody() != null) {
                 context.setVariable("message", item.getBody());
             }
-            String htmlContent = templateEngine.process(item.getTemplateName() != null ? item.getTemplateName() : "example-template", context);
 
+            String templateName = item.getTemplateName() != null ? item.getTemplateName() : "example-template";
+            String htmlContent = templateEngine.process(templateName, context);
+
+            helper.setFrom(mailFrom);
             helper.setTo(item.getTo());
             helper.setSubject(item.getSubject());
             helper.setText(htmlContent, true);
 
+            log.debug("Successfully created MimeMessage for recipient: {}", item.getTo());
             return mimeMessage;
         };
     }
@@ -86,18 +100,14 @@ public class SpringBatchConfig {
     public ItemWriter<MimeMessage> mailItemWriter() {
         return items -> {
             for (MimeMessage message : items) {
+                String subject = message.getSubject();
                 if (dryRun) {
-                    log.info("[Dry-Run] Skipping send: {}", message.getSubject());
+                    log.warn("[Dry-Run] Skipping send for subject: {}", subject);
                 } else {
                     mailSender.send(message);
-                    log.info("Sent email: {}", message.getSubject());
+                    log.info("Successfully sent email with subject: {}", subject);
                 }
             }
         };
-    }
-
-    @Bean
-    public List<MailKafkaDTO> mailQueue() {
-        return mailQueue;
     }
 }
