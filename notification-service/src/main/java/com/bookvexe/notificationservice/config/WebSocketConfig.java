@@ -31,8 +31,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // Endpoint để client kết nối WebSocket tới
         registry.addEndpoint("/ws-notifications")
-                .setAllowedOriginPatterns("*")
-                .withSockJS();
+            // Change the wildcard to the specific client origin
+            // Note: setAllowedOriginPatterns() can take multiple origins
+            .setAllowedOriginPatterns("http://localhost:5173")
+            .withSockJS();
     }
 
 

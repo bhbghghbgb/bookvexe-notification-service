@@ -8,9 +8,9 @@ spring:
     name: notification-service
 
   datasource:
-    url: jdbc:postgresql://localhost:5441/bookvexedb_j2e
+    url: jdbc:postgresql://localhost:5432/bookvexedb_j2e
     username: postgres
-    password: root
+    password: ""
 
   jpa:
     show-sql: true
