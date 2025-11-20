@@ -64,10 +64,10 @@
 
     <form id="mailForm">
         <label for="recipient">Recipient Email:</label>
-        <input type="email" id="recipient" name="recipient" value="user@example.com" required>
+        <input id="recipient" name="recipient" required type="email" value="user@example.com">
 
-        <button type="button" class="direct-btn" onclick="sendMail('direct')">Send Directly (Bypass Batch)</button>
-        <button type="button" class="batch-btn" onclick="sendMail('batch')">Send Through Batch Queue</button>
+        <button class="direct-btn" onclick="sendMail('direct')" type="button">Send Directly (Bypass Batch)</button>
+        <button class="batch-btn" onclick="sendMail('batch')" type="button">Send Through Batch Queue</button>
     </form>
 
     <div class="result" id="result">Awaiting input...</div>

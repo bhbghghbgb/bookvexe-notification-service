@@ -1,7 +1,5 @@
 package com.bookvexe.mailservice.config;
 
-import com.bookvexe.mailservice.config.RateLimitRule;
-
 import java.util.List;
 
 public class RateLimiter {
