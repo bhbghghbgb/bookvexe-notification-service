@@ -47,7 +47,7 @@ public class MailConsumer {
 
         try {
             if (!rateLimiter.canSend()) {
-                log.debug("Rate limiter blocked this mail.");
+                log.debug("Rate limiter blocked this batch.");
                 return;
             }
 
