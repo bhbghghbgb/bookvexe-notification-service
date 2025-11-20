@@ -47,8 +47,8 @@ public class SpringBatchConfig {
 
     @Bean
     public Step sendMailStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
-        log.debug("Configuring Spring Batch Step: sendMailStep with chunk size 10");
-        return new StepBuilder("sendMailStep", jobRepository).<MailKafkaDTO, MimeMessage>chunk(10, transactionManager) // Process 10 emails per batch
+        log.debug("Configuring Spring Batch Step: sendMailStep with chunk size 1");
+        return new StepBuilder("sendMailStep", jobRepository).<MailKafkaDTO, MimeMessage>chunk(1, transactionManager) // Process 1 emails per batch
             .reader(mailItemReader()).processor(mailItemProcessor()).writer(mailItemWriter()).build();
     }
 
