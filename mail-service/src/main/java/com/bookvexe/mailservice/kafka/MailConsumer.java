@@ -11,7 +11,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
@@ -21,7 +21,7 @@ public class MailConsumer {
 
     private final JobLauncher jobLauncher;
     private final Job sendMailJob;
-    private final List<MailKafkaDTO> mailQueue;
+    private final Queue<MailKafkaDTO> mailQueue;
     private final RateLimiter rateLimiter;
 
     private final AtomicBoolean jobRunning = new AtomicBoolean(false);
@@ -29,10 +29,8 @@ public class MailConsumer {
     @KafkaListener(topics = "mail-topic", groupId = "mail_group")
     public void consume(MailKafkaDTO kafkaDTO) {
         log.info("Received mail request from Kafka for recipient: {}", kafkaDTO.getTo());
-        synchronized (mailQueue) {
-            mailQueue.add(kafkaDTO);
-            log.debug("Mail added to internal queue. Current size: {}", mailQueue.size());
-        }
+        mailQueue.add(kafkaDTO);
+        log.debug("Mail added to internal queue. Current size: {}", mailQueue.size());
     }
 
     // Check queue and trigger batch job, throttled by time and count

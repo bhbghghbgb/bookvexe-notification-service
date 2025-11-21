@@ -1,6 +1,7 @@
 package com.bookvexe.mailservice.batch;
 
 import com.bookvexe.mailservice.dto.MailKafkaDTO;
+import com.bookvexe.mailservice.dto.ProcessedMailItem;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,13 +16,14 @@ import org.springframework.batch.item.ItemWriter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
-import java.util.List;
+import java.util.Queue;
 
 @Configuration
 @RequiredArgsConstructor
@@ -30,14 +32,16 @@ public class SpringBatchConfig {
 
     private final JavaMailSender mailSender;
     private final TemplateEngine templateEngine;
-    // Inject the mailQueue bean
-    private final List<MailKafkaDTO> mailQueue;
+    private final Queue<MailKafkaDTO> mailQueue;
 
     @Value("${mail.dry-run:false}")
     private boolean dryRun;
 
-    @Value("${spring.mail.username}") // Inject the configured username
+    @Value("${spring.mail.username}")
     private String mailFrom;
+
+    @Value("${mail.max-retries:3}")
+    private int maxRetries;
 
     @Bean
     public Job sendMailJob(JobRepository jobRepository, Step sendMailStep) {
@@ -48,27 +52,29 @@ public class SpringBatchConfig {
     @Bean
     public Step sendMailStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         log.debug("Configuring Spring Batch Step: sendMailStep with chunk size 2");
-        return new StepBuilder("sendMailStep", jobRepository).<MailKafkaDTO, MimeMessage>chunk(2, transactionManager) // Process 2 emails per batch
-            .reader(mailItemReader()).processor(mailItemProcessor()).writer(mailItemWriter()).build();
+        return new StepBuilder("sendMailStep", jobRepository)
+            .<MailKafkaDTO, ProcessedMailItem>chunk(2, transactionManager)
+            .reader(mailItemReader())
+            .processor(mailItemProcessor())
+            .writer(mailItemWriter())
+            .build();
     }
 
     @Bean
     public ItemReader<MailKafkaDTO> mailItemReader() {
         return () -> {
-            synchronized (mailQueue) {
-                if (!mailQueue.isEmpty()) {
-                    MailKafkaDTO mailDto = mailQueue.remove(0);
-                    log.debug("Reading mail from queue for recipient: {}", mailDto.getTo());
-                    return mailDto;
-                }
+            MailKafkaDTO mailDto = mailQueue.poll();
+            if (mailDto != null) {
+                log.debug("Reading mail from queue for recipient: {}", mailDto.getTo());
+                return mailDto;
             }
             log.debug("Mail queue is empty, ending batch reading.");
-            return null; // End of reading
+            return null;
         };
     }
 
     @Bean
-    public ItemProcessor<MailKafkaDTO, MimeMessage> mailItemProcessor() {
+    public ItemProcessor<MailKafkaDTO, ProcessedMailItem> mailItemProcessor() {
         return item -> {
             log.info("Processing mail for recipient: {}", item.getTo());
             MimeMessage mimeMessage = mailSender.createMimeMessage();
@@ -92,20 +98,45 @@ public class SpringBatchConfig {
             helper.setText(htmlContent, true);
 
             log.debug("Successfully created MimeMessage for recipient: {}", item.getTo());
-            return mimeMessage;
+            return new ProcessedMailItem(item, mimeMessage, 0);
         };
     }
 
     @Bean
-    public ItemWriter<MimeMessage> mailItemWriter() {
+    public ItemWriter<ProcessedMailItem> mailItemWriter() {
         return items -> {
-            for (MimeMessage message : items) {
-                String subject = message.getSubject();
+            for (ProcessedMailItem mailItem : items) {
+                MailKafkaDTO mailDto = mailItem.getOriginalDto();
+                MimeMessage message = mailItem.getMimeMessage();
+
+                String subject = mailDto.getSubject();
+                String recipient = mailDto.getTo();
+
                 if (dryRun) {
-                    log.warn("[Dry-Run] Skipping send for subject: {}", subject);
+                    log.warn("[Dry-Run] Skipping send for subject: {} to: {}", subject, recipient);
                 } else {
-                    mailSender.send(message);
-                    log.info("Successfully sent email with subject: {}", subject);
+                    try {
+                        mailSender.send(message);
+                        log.info("Successfully sent email with subject: {} to: {}", subject, recipient);
+                    } catch (MailException e) {
+                        log.error("Failed to send email with subject: {} to: {}. Error: {}",
+                            subject, recipient, e.getMessage());
+
+                        if (mailItem.getRetryCount() < maxRetries) {
+                            ProcessedMailItem retryItem = mailItem.withIncrementedRetry();
+                            // Re-queue the original DTO (not the processed item)
+                            mailQueue.offer(retryItem.getOriginalDto());
+                            log.warn("Re-queued failed email for retry {}/{} for recipient: {}",
+                                retryItem.getRetryCount(), maxRetries, recipient);
+                        } else {
+                            log.error("Max retries exceeded ({}) for email to: {}. Moving to dead letter.",
+                                maxRetries, recipient);
+                            // Here you could move to a dead letter queue
+                            // For now, we just log and don't re-queue
+                        }
+
+                        throw e; // Re-throw to mark the chunk as failed
+                    }
                 }
             }
         };

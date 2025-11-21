@@ -57,6 +57,7 @@ spring:
 # Custom Mail Flag
 mail:
   dry-run: false
+  max-retries: 3
 
 logging:
   level:

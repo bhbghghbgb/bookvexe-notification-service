@@ -16,8 +16,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
-import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 
 @Controller
 @RequestMapping("/test")
@@ -27,7 +27,7 @@ public class MailTestController {
 
     private final JavaMailSender mailSender;
     private final TemplateEngine templateEngine;
-    private final List<MailKafkaDTO> mailQueue;
+    private final Queue<MailKafkaDTO> mailQueue;
 
     @Value("${mail.dry-run:false}")
     private boolean dryRun;
@@ -85,9 +85,7 @@ public class MailTestController {
 
         MailKafkaDTO mailDto = new MailKafkaDTO(recipient, "Batch Queued Test Email", "This email was queued via the test endpoint for batch processing.", "example-template", Map.of("name", "Batch User"));
 
-        synchronized (mailQueue) {
-            mailQueue.add(mailDto);
-        }
+        mailQueue.add(mailDto);
 
         log.info("Mail queued for batch. Current queue size: {}", mailQueue.size());
         return ResponseEntity.ok("Mail queued for batch processing to " + recipient + ". It will be processed on the next scheduled run.");

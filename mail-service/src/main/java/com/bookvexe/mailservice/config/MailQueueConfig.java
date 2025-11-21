@@ -4,15 +4,14 @@ import com.bookvexe.mailservice.dto.MailKafkaDTO;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 @Configuration
 public class MailQueueConfig {
 
     @Bean
-    public List<MailKafkaDTO> mailQueue() {
-        return Collections.synchronizedList(new ArrayList<>());
+    public Queue<MailKafkaDTO> mailQueue() {
+        return new ConcurrentLinkedQueue<>();
     }
 }
